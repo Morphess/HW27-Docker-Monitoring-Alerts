@@ -1,0 +1,11 @@
+global:
+  resolve_timeout: 1m
+route:
+  receiver: local-only
+  group_by: [alertname, instance, job, demonstration]
+  group_wait: 10s
+  group_interval: 30s
+  repeat_interval: 4h
+receivers:
+  # Intentionally no external delivery until Telegram is explicitly enabled.
+  - name: local-only

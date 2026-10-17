@@ -1,0 +1,23 @@
+global:
+  resolve_timeout: 1m
+route:
+  receiver: telegram
+  group_by: [alertname, instance, job, demonstration]
+  group_wait: 10s
+  group_interval: 30s
+  repeat_interval: 4h
+receivers:
+  - name: telegram
+    telegram_configs:
+      - bot_token_file: /run/secrets/telegram_bot_token
+        chat_id: CHAT_ID_PLACEHOLDER
+        send_resolved: true
+        parse_mode: ''
+        message: |-
+          [{{ .Status | toUpper }}] HW27 monitoring
+          {{ range .Alerts }}{{ .Labels.alertname }}
+          Instance: {{ .Labels.instance }} | Job: {{ .Labels.job }}
+          {{ if .Labels.demonstration }}DEMONSTRATION: {{ .Labels.demonstration }}{{ end }}
+          {{ .Annotations.summary }}
+          {{ .Annotations.description }}
+          {{ end }}

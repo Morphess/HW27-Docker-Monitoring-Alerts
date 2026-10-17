@@ -1,0 +1,114 @@
+name: hw27-monitoring
+
+# Native Linux: host networking is intentional. Every HTTP listener is loopback-only.
+x-common: &common
+  restart: unless-stopped
+  network_mode: host
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "2"
+
+services:
+  prometheus:
+    <<: *common
+    image: prom/prometheus:v3.15.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --storage.tsdb.retention.size=2GB
+      - --web.listen-address=127.0.0.1:9090
+      - --web.external-url=http://127.0.0.1:9090
+      - --web.enable-lifecycle
+    volumes:
+      - ./prometheus:/etc/prometheus:ro,z
+      - ./tests:/tests:ro,z
+      - prometheus-data:/prometheus
+    mem_limit: 768m
+
+  grafana:
+    <<: *common
+    image: grafana/grafana:13.2.4
+    environment:
+      GF_SERVER_HTTP_ADDR: 127.0.0.1
+      GF_SERVER_HTTP_PORT: "3000"
+      GF_SERVER_ROOT_URL: http://127.0.0.1:3000
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-hw27-local-admin-change-me}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro,z
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro,z
+      - grafana-data:/var/lib/grafana
+    mem_limit: 768m
+
+  alertmanager:
+    <<: *common
+    image: prom/alertmanager:v0.34.1
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+      - --web.listen-address=127.0.0.1:9093
+      - --web.external-url=http://127.0.0.1:9093
+      - --cluster.listen-address=
+    volumes:
+      - ./alertmanager:/etc/alertmanager:ro,z
+      - alertmanager-data:/alertmanager
+    mem_limit: 128m
+
+  node-exporter:
+    <<: *common
+    image: prom/node-exporter:v1.12.1
+    pid: host
+    security_opt:
+      - label=disable
+    command:
+      - --web.listen-address=127.0.0.1:9100
+      - --path.rootfs=/host
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --path.udev.data=/host/run/udev/data
+      - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run|var/lib/docker|var/lib/containers|var/lib/containerd)($$|/)
+    volumes:
+      - /:/host:ro,rslave
+    mem_limit: 128m
+
+  cadvisor:
+    <<: *common
+    image: ghcr.io/google/cadvisor:v0.60.6
+    cgroup: host
+    security_opt:
+      - label=disable
+    command:
+      - --listen_ip=127.0.0.1
+      - --port=8080
+      - --docker_only=true
+      - --housekeeping_interval=15s
+      - --store_container_labels=false
+      - --whitelisted_container_labels=com.docker.compose.project,com.docker.compose.service
+      - --enable_metrics=cpu,memory,network,diskIO,disk
+    # Upstream probes "localhost" (::1 here); this service deliberately binds IPv4 only.
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+    volumes:
+      - /:/rootfs:ro,rslave
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      # Needed for Docker metadata/names; read-only bind does NOT make the API read-only.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Docker 29 overlayfs snapshotter requires this for cAdvisor's Docker factory.
+      - /run/containerd/containerd.sock:/run/containerd/containerd.sock:ro
+    mem_limit: 512m
+
+volumes:
+  prometheus-data:
+  grafana-data:
+  alertmanager-data:

@@ -1,0 +1,40 @@
+groups:
+  - name: host-and-scrape-alerts
+    rules:
+      - alert: HostDiskSpaceLow
+        expr: |
+          (
+            100 * node_filesystem_avail_bytes{
+              fstype!~"autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|efivarfs|fusectl|fuse[.]lxcfs|hugetlbfs|mqueue|nsfs|overlay|proc|pstore|ramfs|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs|tmpfs",
+              mountpoint!~"/(dev|proc|sys)($|/.*)|/(var/lib|run)/(docker|containers|containerd|kubelet)($|/.*)|/run/user/[0-9]+/(docker|containers)($|/.*)|/(home/[^/]+|var/home/[^/]+|root)/[.]local/share/(docker|containers)($|/.*)"
+            } / node_filesystem_size_bytes < 15
+          )
+          and on (instance, job, device, mountpoint, fstype)
+          (node_filesystem_readonly == 0)
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Low disk space on {{ $labels.instance }} ({{ $labels.job }})'
+          description: 'Available disk space on {{ $labels.instance }} (job {{ $labels.job }}, mount {{ $labels.mountpoint }}) is {{ printf "%.1f" $value }}% (threshold: <15%) for 2 minutes.'
+
+      - alert: HostHighCpuUsage
+        expr: |
+          100 * (1 - avg by (instance, job) (
+            rate(node_cpu_seconds_total{mode="idle"}[5m])
+          )) > 80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'High CPU usage on {{ $labels.instance }} ({{ $labels.job }})'
+          description: 'CPU usage on {{ $labels.instance }} (job {{ $labels.job }}) is {{ printf "%.1f" $value }}% (threshold: >80%), averaged across cores over 5 minutes, for 2 minutes.'
+
+      - alert: PrometheusTargetDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Scrape target down: {{ $labels.instance }} ({{ $labels.job }})'
+          description: 'Scrape availability for {{ $labels.instance }} (job {{ $labels.job }}) is {{ printf "%.0f" $value }} (threshold: ==0; expected 1) for 1 minute.'

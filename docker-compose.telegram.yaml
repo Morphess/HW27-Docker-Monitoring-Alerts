@@ -1,0 +1,6 @@
+services:
+  alertmanager:
+    volumes:
+      - ./local/alertmanager.telegram.yml:/etc/alertmanager/alertmanager.yml:ro,z
+      # Shared SELinux label is required for a local secret bind on enforcing hosts.
+      - ./local/telegram_bot_token:/run/secrets/telegram_bot_token:ro,z

@@ -1,0 +1,167 @@
+rule_files:
+  - /etc/prometheus/rules/host-alerts.yml
+
+evaluation_interval: 15s
+
+tests:
+  # The writable btrfs root must fire; exactly 15% and 16% must not.
+  # Low-space pseudo, read-only and container filesystems must not fire.
+  - name: disk boundaries and host filesystem filtering
+    interval: 15s
+    input_series:
+      - series: 'node_filesystem_avail_bytes{instance="fedora:9100",job="node-exporter",device="/dev/mapper/fedora-root",mountpoint="/",fstype="btrfs"}'
+        values: '14+0x12'
+      - series: 'node_filesystem_size_bytes{instance="fedora:9100",job="node-exporter",device="/dev/mapper/fedora-root",mountpoint="/",fstype="btrfs"}'
+        values: '100+0x12'
+      - series: 'node_filesystem_readonly{instance="fedora:9100",job="node-exporter",device="/dev/mapper/fedora-root",mountpoint="/",fstype="btrfs"}'
+        values: '0+0x12'
+      - series: 'node_filesystem_avail_bytes{instance="fedora:9100",job="node-exporter",device="/dev/sdb1",mountpoint="/boundary",fstype="ext4"}'
+        values: '15+0x12'
+      - series: 'node_filesystem_size_bytes{instance="fedora:9100",job="node-exporter",device="/dev/sdb1",mountpoint="/boundary",fstype="ext4"}'
+        values: '100+0x12'
+      - series: 'node_filesystem_readonly{instance="fedora:9100",job="node-exporter",device="/dev/sdb1",mountpoint="/boundary",fstype="ext4"}'
+        values: '0+0x12'
+      - series: 'node_filesystem_avail_bytes{instance="fedora:9100",job="node-exporter",device="/dev/sdc1",mountpoint="/data",fstype="xfs"}'
+        values: '16+0x12'
+      - series: 'node_filesystem_size_bytes{instance="fedora:9100",job="node-exporter",device="/dev/sdc1",mountpoint="/data",fstype="xfs"}'
+        values: '100+0x12'
+      - series: 'node_filesystem_readonly{instance="fedora:9100",job="node-exporter",device="/dev/sdc1",mountpoint="/data",fstype="xfs"}'
+        values: '0+0x12'
+      - series: 'node_filesystem_avail_bytes{instance="fedora:9100",job="node-exporter",device="/dev/sdd1",mountpoint="/readonly",fstype="ext4"}'
+        values: '14+0x12'
+      - series: 'node_filesystem_size_bytes{instance="fedora:9100",job="node-exporter",device="/dev/sdd1",mountpoint="/readonly",fstype="ext4"}'
+        values: '100+0x12'
+      - series: 'node_filesystem_readonly{instance="fedora:9100",job="node-exporter",device="/dev/sdd1",mountpoint="/readonly",fstype="ext4"}'
+        values: '1+0x12'
+      - series: 'node_filesystem_avail_bytes{instance="fedora:9100",job="node-exporter",device="tmpfs",mountpoint="/tmp",fstype="tmpfs"}'
+        values: '1+0x12'
+      - series: 'node_filesystem_size_bytes{instance="fedora:9100",job="node-exporter",device="tmpfs",mountpoint="/tmp",fstype="tmpfs"}'
+        values: '100+0x12'
+      - series: 'node_filesystem_readonly{instance="fedora:9100",job="node-exporter",device="tmpfs",mountpoint="/tmp",fstype="tmpfs"}'
+        values: '0+0x12'
+      - series: 'node_filesystem_avail_bytes{instance="fedora:9100",job="node-exporter",device="overlay",mountpoint="/srv/overlay",fstype="overlay"}'
+        values: '1+0x12'
+      - series: 'node_filesystem_size_bytes{instance="fedora:9100",job="node-exporter",device="overlay",mountpoint="/srv/overlay",fstype="overlay"}'
+        values: '100+0x12'
+      - series: 'node_filesystem_readonly{instance="fedora:9100",job="node-exporter",device="overlay",mountpoint="/srv/overlay",fstype="overlay"}'
+        values: '0+0x12'
+      - series: 'node_filesystem_avail_bytes{instance="fedora:9100",job="node-exporter",device="/dev/mapper/fedora-root",mountpoint="/var/lib/docker/btrfs/subvolumes/example",fstype="btrfs"}'
+        values: '1+0x12'
+      - series: 'node_filesystem_size_bytes{instance="fedora:9100",job="node-exporter",device="/dev/mapper/fedora-root",mountpoint="/var/lib/docker/btrfs/subvolumes/example",fstype="btrfs"}'
+        values: '100+0x12'
+      - series: 'node_filesystem_readonly{instance="fedora:9100",job="node-exporter",device="/dev/mapper/fedora-root",mountpoint="/var/lib/docker/btrfs/subvolumes/example",fstype="btrfs"}'
+        values: '0+0x12'
+      - series: 'node_filesystem_avail_bytes{instance="fedora:9100",job="node-exporter",device="/dev/mapper/fedora-root",mountpoint="/var/lib/containers/storage/example",fstype="btrfs"}'
+        values: '1+0x12'
+      - series: 'node_filesystem_size_bytes{instance="fedora:9100",job="node-exporter",device="/dev/mapper/fedora-root",mountpoint="/var/lib/containers/storage/example",fstype="btrfs"}'
+        values: '100+0x12'
+      - series: 'node_filesystem_readonly{instance="fedora:9100",job="node-exporter",device="/dev/mapper/fedora-root",mountpoint="/var/lib/containers/storage/example",fstype="btrfs"}'
+        values: '0+0x12'
+      - series: 'node_filesystem_avail_bytes{instance="fedora:9100",job="node-exporter",device="/dev/mapper/fedora-root",mountpoint="/var/home/user/.local/share/containers/storage/example",fstype="btrfs"}'
+        values: '1+0x12'
+      - series: 'node_filesystem_size_bytes{instance="fedora:9100",job="node-exporter",device="/dev/mapper/fedora-root",mountpoint="/var/home/user/.local/share/containers/storage/example",fstype="btrfs"}'
+        values: '100+0x12'
+      - series: 'node_filesystem_readonly{instance="fedora:9100",job="node-exporter",device="/dev/mapper/fedora-root",mountpoint="/var/home/user/.local/share/containers/storage/example",fstype="btrfs"}'
+        values: '0+0x12'
+    alert_rule_test:
+      - eval_time: 1m45s
+        alertname: HostDiskSpaceLow
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: HostDiskSpaceLow
+        exp_alerts:
+          - exp_labels:
+              instance: fedora:9100
+              job: node-exporter
+              device: /dev/mapper/fedora-root
+              mountpoint: /
+              fstype: btrfs
+              severity: warning
+            exp_annotations:
+              summary: 'Low disk space on fedora:9100 (node-exporter)'
+              description: 'Available disk space on fedora:9100 (job node-exporter, mount /) is 14.0% (threshold: <15%) for 2 minutes.'
+
+  # Wait past the complete 5-minute rate window and 2-minute hold.
+  # Unequal core loads catch max/sum aggregation; a second job on the same
+  # instance catches accidental removal of job from the aggregation key.
+  - name: cpu 81 versus 79 and exactly 80 across cores instances and jobs
+    interval: 15s
+    input_series:
+      - series: 'node_cpu_seconds_total{instance="fedora:9100",job="node-exporter",cpu="0",mode="idle"}'
+        values: '1000+1.5x32'
+      - series: 'node_cpu_seconds_total{instance="fedora:9100",job="node-exporter",cpu="1",mode="idle"}'
+        values: '1000+4.2x32'
+      - series: 'node_cpu_seconds_total{instance="other:9100",job="node-exporter",cpu="0",mode="idle"}'
+        values: '1000+1.5x32'
+      - series: 'node_cpu_seconds_total{instance="other:9100",job="node-exporter",cpu="1",mode="idle"}'
+        values: '1000+4.8x32'
+      - series: 'node_cpu_seconds_total{instance="fedora:9100",job="node-exporter-secondary",cpu="0",mode="idle"}'
+        values: '1000+1.5x32'
+      - series: 'node_cpu_seconds_total{instance="fedora:9100",job="node-exporter-secondary",cpu="1",mode="idle"}'
+        values: '1000+4.5x32'
+      # A non-idle series must never contribute to the CPU average.
+      - series: 'node_cpu_seconds_total{instance="fedora:9100",job="node-exporter",cpu="0",mode="user"}'
+        values: '1000+13.5x32'
+    alert_rule_test:
+      - eval_time: 7m
+        alertname: HostHighCpuUsage
+        exp_alerts:
+          - exp_labels:
+              instance: fedora:9100
+              job: node-exporter
+              severity: warning
+            exp_annotations:
+              summary: 'High CPU usage on fedora:9100 (node-exporter)'
+              description: 'CPU usage on fedora:9100 (job node-exporter) is 81.0% (threshold: >80%), averaged across cores over 5 minutes, for 2 minutes.'
+
+  # After five minutes at 50% busy, both idle counters stop increasing.
+  # The rolling 5-minute average first exceeds 80% at 8m, so it must
+  # remain pending at 9m45s and fire at 10m (when usage is 100%).
+  - name: cpu must stay high for the full two minutes
+    interval: 15s
+    input_series:
+      - series: 'node_cpu_seconds_total{instance="fedora:9100",job="node-exporter",cpu="0",mode="idle"}'
+        values: '1000+7.5x20 1150+0x20'
+      - series: 'node_cpu_seconds_total{instance="fedora:9100",job="node-exporter",cpu="1",mode="idle"}'
+        values: '1000+7.5x20 1150+0x20'
+    alert_rule_test:
+      - eval_time: 9m45s
+        alertname: HostHighCpuUsage
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: HostHighCpuUsage
+        exp_alerts:
+          - exp_labels:
+              instance: fedora:9100
+              job: node-exporter
+              severity: warning
+            exp_annotations:
+              summary: 'High CPU usage on fedora:9100 (node-exporter)'
+              description: 'CPU usage on fedora:9100 (job node-exporter) is 100.0% (threshold: >80%), averaged across cores over 5 minutes, for 2 minutes.'
+
+  # First failure is at 15s; the one-minute hold expires at 1m15s.
+  - name: scrape target pending firing and recovery
+    interval: 15s
+    input_series:
+      - series: 'up{instance="fedora:9100",job="node-exporter"}'
+        values: '1 0+0x5 1+0x3'
+    alert_rule_test:
+      - eval_time: 0s
+        alertname: PrometheusTargetDown
+        exp_alerts: []
+      - eval_time: 1m
+        alertname: PrometheusTargetDown
+        exp_alerts: []
+      - eval_time: 1m15s
+        alertname: PrometheusTargetDown
+        exp_alerts:
+          - exp_labels:
+              instance: fedora:9100
+              job: node-exporter
+              severity: critical
+            exp_annotations:
+              summary: 'Scrape target down: fedora:9100 (node-exporter)'
+              description: 'Scrape availability for fedora:9100 (job node-exporter) is 0 (threshold: ==0; expected 1) for 1 minute.'
+      - eval_time: 1m45s
+        alertname: PrometheusTargetDown
+        exp_alerts: []
